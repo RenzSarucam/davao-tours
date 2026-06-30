@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-type Me = { name: string; role: string } | null;
+type Me = { name: string; role: string; email?: string } | null;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -63,43 +63,88 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             {me ? (
               <div className="relative">
+                {/* Avatar trigger */}
                 <button onClick={() => setMenuOpen(o => !o)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-full border-2 transition-all"
-                  style={{ borderColor: "#00B14F", color: "#00B14F" }}>
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: "#00B14F" }}>
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-xl transition-all hover:bg-gray-50">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md"
+                    style={{ background: "linear-gradient(135deg, #00B14F, #00803A)" }}>
                     {me.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <div className="text-sm font-bold text-gray-900 leading-tight">{me.name.split(" ")[0]}</div>
+                    <div className="text-xs capitalize" style={{ color: "#00B14F" }}>{me.role}</div>
+                  </div>
+                  <span className="text-gray-400 text-xs transition-transform duration-200"
+                    style={{ display: "inline-block", transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                    ▾
                   </span>
-                  <span className="text-sm font-semibold hidden sm:block">{me.name.split(" ")[0]}</span>
-                  <span className="text-xs">▾</span>
                 </button>
 
+                {/* Dropdown */}
                 {menuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                    <div className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <div className="font-semibold text-gray-900 text-sm">{me.name}</div>
-                        <div className="text-xs text-gray-400 capitalize">{me.role}</div>
+                    <div className="absolute right-0 top-14 w-56 rounded-2xl shadow-2xl overflow-hidden z-50"
+                      style={{ background: "#fff", border: "1px solid #e5e7eb" }}>
+
+                      {/* User info header */}
+                      <div className="px-4 py-4 border-b border-gray-100"
+                        style={{ background: "linear-gradient(135deg, #E8F8EE, #f0fdf4)" }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white shadow-md"
+                            style={{ background: "linear-gradient(135deg, #00B14F, #00803A)" }}>
+                            {me.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900 text-sm leading-tight">{me.name}</div>
+                            {me.email && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-[130px]">{me.email}</div>}
+                            <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold"
+                              style={{ background: "#E8F8EE", color: "#00803A" }}>
+                              {me.role === "admin" ? "⚙️ Admin" : "👤 Customer"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      {me.role === "admin" && (
-                        <Link href="/admin"
-                          className="flex items-center gap-2 px-4 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
-                          style={{ color: "#00B14F" }}
+
+                      {/* Menu items */}
+                      <div className="py-1">
+                        {me.role === "admin" && (
+                          <Link href="/admin"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
+                            style={{ color: "#00B14F" }}
+                            onClick={() => setMenuOpen(false)}>
+                            ⚙️ Admin Panel
+                          </Link>
+                        )}
+                        <Link href="/profile"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           onClick={() => setMenuOpen(false)}>
-                          ⚙️ Admin Panel
+                          ✏️ Edit Profile
                         </Link>
-                      )}
-                      <Link href="/my-bookings"
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        onClick={() => setMenuOpen(false)}>
-                        📋 My Bookings
-                      </Link>
-                      <div className="border-t border-gray-100" />
-                      <button onClick={logout}
-                        className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                        🚪 Sign Out
-                      </button>
+                        <Link href="/vehicles"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          onClick={() => setMenuOpen(false)}>
+                          🚐 Browse Vehicles
+                        </Link>
+                        <Link href="/booking"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          onClick={() => setMenuOpen(false)}>
+                          📋 Book a Vehicle
+                        </Link>
+                        <Link href="/my-bookings"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          onClick={() => setMenuOpen(false)}>
+                          🗂️ My Bookings
+                        </Link>
+                      </div>
+
+                      <div className="border-t border-gray-100 py-1">
+                        <button onClick={logout}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold hover:bg-red-50 transition-colors text-left"
+                          style={{ color: "#ef4444" }}>
+                          🚪 Sign Out
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}

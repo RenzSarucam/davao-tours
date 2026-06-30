@@ -1,10 +1,14 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { PrismaSqlite } from "prisma-adapter-sqlite";
-import path from "path";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
-const dbPath = path.resolve(process.cwd(), "dev.db");
-const adapter = new PrismaSqlite({ url: dbPath });
-const prisma = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
+function parseDbUrl(url: string) {
+  const u = new URL(url);
+  return { host: u.hostname, port: u.port ? parseInt(u.port) : 3306, user: u.username || "root", password: u.password || undefined, database: u.pathname.replace(/^\//, ""), allowPublicKeyRetrieval: true };
+}
+
+const adapter = new PrismaMariaDb(parseDbUrl(process.env.DATABASE_URL as string));
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.vehicle.createMany({

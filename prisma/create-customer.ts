@@ -12,26 +12,27 @@ const adapter = new PrismaMariaDb(parseDbUrl(process.env.DATABASE_URL as string)
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const existing = await prisma.user.findUnique({ where: { username: "admin" } });
+  const existing = await prisma.customer.findUnique({ where: { email: "renz@gmail.com" } });
   if (existing) {
-    console.log("⚠️  Admin user already exists. Skipping.");
+    console.log("⚠️  Account already exists:", existing.email);
     return;
   }
 
-  const hashed = await bcrypt.hash("admin123", 12);
-  const user = await prisma.user.create({
+  const hashed = await bcrypt.hash("user123", 12);
+  const customer = await prisma.customer.create({
     data: {
-      username: "admin",
+      name: "Renz Carl",
+      email: "renz@gmail.com",
       password: hashed,
-      name: "Renz Admin",
-      role: "admin",
+      phone: "09123456789",
     },
   });
 
-  console.log(`✅ Admin user created:`);
-  console.log(`   Username : ${user.username}`);
-  console.log(`   Password : admin123`);
-  console.log(`   Name     : ${user.name}`);
+  console.log("✅ Customer account created!");
+  console.log(`   Name     : ${customer.name}`);
+  console.log(`   Email    : ${customer.email}`);
+  console.log(`   Password : user123`);
+  console.log(`   Phone    : ${customer.phone}`);
 }
 
 main()
