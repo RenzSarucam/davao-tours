@@ -25,15 +25,16 @@ model Vehicle {
 }
 
 model Driver {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   name       String
   phone      String
-  licenseNo  String   @unique
-  experience Int      @default(0)
-  status     String   @default("available")
+  licenseNo  String    @unique
+  experience Int       @default(0)
+  status     String    @default("available")
   notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  bookings   Booking[]
 }
 
 model TourPackage {
@@ -69,19 +70,24 @@ model Customer {
 }
 
 model Booking {
-  id            Int       @id @default(autoincrement())
-  vehicleId     Int
-  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id])
-  customerId    Int?
-  customer      Customer? @relation(fields: [customerId], references: [id])
-  customerName  String
-  customerEmail String
-  customerPhone String
-  startDate     DateTime
-  endDate       DateTime
-  totalPrice    Float
-  status        String    @default("pending")
-  notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 Int       @id @default(autoincrement())
+  vehicleId          Int
+  vehicle            Vehicle   @relation(fields: [vehicleId], references: [id])
+  customerId         Int?
+  customer           Customer? @relation(fields: [customerId], references: [id])
+  customerName       String
+  customerEmail      String
+  customerPhone      String
+  startDate          DateTime
+  endDate            DateTime
+  totalPrice         Float
+  status             String    @default("pending")
+  notes              String?
+  needsDriver        Boolean   @default(false)
+  assignedDriverId   Int?
+  assignedDriver     Driver?   @relation(fields: [assignedDriverId], references: [id])
+  licenseHolderName  String?
+  licenseImageUrl    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }

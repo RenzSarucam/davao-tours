@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 function parseDbUrl(url: string) {
-  const u = new URL(url);
+  const u = new URL(url.replace(/^mysql:\/\//, "mariadb://"));
   return { host: u.hostname, port: u.port ? parseInt(u.port) : 3306, user: u.username || "root", password: u.password || undefined, database: u.pathname.replace(/^\//, ""), allowPublicKeyRetrieval: true };
 }
 

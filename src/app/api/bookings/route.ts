@@ -36,6 +36,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Vehicle is not available for selected dates" }, { status: 409 });
   }
 
+  // Use customer-selected driver if provided, else auto-assign most experienced
+  let assignedDriverId: number | null = null;
+  if (body.needsDriver) {
+    if (body.assignedDriverId) {
+      assignedDriverId = Number(body.assignedDriverId);
+    } else {
+      const driver = await prisma.driver.findFirst({
+        where: { status: "available" },
+        orderBy: { experience: "desc" },
+      });
+      if (driver) assignedDriverId = driver.id;
+    }
+  }
+
   const booking = await prisma.booking.create({
     data: {
       vehicleId: Number(body.vehicleId),
@@ -47,8 +61,12 @@ export async function POST(request: NextRequest) {
       totalPrice: vehicle.pricePerDay * days,
       status: "pending",
       notes: body.notes || null,
+      needsDriver: !!body.needsDriver,
+      assignedDriverId,
+      licenseHolderName: body.needsDriver ? null : (body.licenseHolderName || null),
+      licenseImageUrl: body.needsDriver ? null : (body.licenseImageUrl || null),
     },
-    include: { vehicle: true },
+    include: { vehicle: true, assignedDriver: true },
   });
 
   return Response.json(booking, { status: 201 });
