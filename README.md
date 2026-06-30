@@ -1,6 +1,6 @@
 # 🚐 Davao Tours — Vehicle Rental System
 
-A full-stack vehicle rental booking system for Davao City, built with Next.js and styled after the Grab design system (green theme).
+A full-stack vehicle rental booking system for Davao City, built with Next.js with a modern green-themed UI.
 
 ---
 
@@ -155,7 +155,7 @@ davao-tours/
 
 ## 🎨 Design
 
-Inspired by the **Grab** app design language:
+Clean and modern green color palette:
 
 | Color | Hex | Usage |
 |---|---|---|
