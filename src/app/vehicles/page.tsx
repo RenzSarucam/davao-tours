@@ -19,52 +19,128 @@ type Vehicle = {
 };
 
 const ICONS: Record<string, string> = { Van: "🚐", Coaster: "🚌", SUV: "🚙", Sedan: "🚗", Minibus: "🚎", Pickup: "🛻", Motorcycle: "🏍️" };
+const TYPE_BG: Record<string, string> = { Van: "#dbeafe", Coaster: "#dcfce7", SUV: "#fef3c7", Sedan: "#f3e8ff", Minibus: "#fee2e2", Pickup: "#fef9c3", Motorcycle: "#ffedd5" };
 
-const TYPE_BG: Record<string, string> = {
-  Van: "#dbeafe", Coaster: "#dcfce7", SUV: "#fef3c7",
-  Sedan: "#f3e8ff", Minibus: "#fee2e2", Pickup: "#fef9c3", Motorcycle: "#ffedd5",
-};
+const today = new Date().toISOString().split("T")[0];
 
 export default function VehiclesPage() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [allCount, setAllCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [me, setMe] = useState<{ role: string } | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [dateFiltered, setDateFiltered] = useState(false);
 
   const types = ["All", ...Array.from(new Set(vehicles.map(v => v.type)))];
 
+  const fetchVehicles = (start?: string, end?: string) => {
+    setLoading(true);
+    const url = start && end
+      ? `/api/vehicles?startDate=${start}&endDate=${end}`
+      : "/api/vehicles";
+    fetch(url).then(r => r.json()).then(d => {
+      setVehicles(d);
+      setLoading(false);
+    });
+  };
+
   useEffect(() => {
-    fetch("/api/vehicles").then(r => r.json()).then(d => { setVehicles(d); setLoading(false); });
+    fetchVehicles();
+    fetch("/api/vehicles").then(r => r.json()).then(d => setAllCount(d.length));
     fetch("/api/auth/me").then(r => r.json()).then(setMe);
   }, []);
 
-  const filtered = filter === "All" ? vehicles : vehicles.filter(v => v.type === filter);
+  const handleSearch = () => {
+    if (!startDate || !endDate) return;
+    setDateFiltered(true);
+    fetchVehicles(startDate, endDate);
+  };
+
+  const handleClear = () => {
+    setStartDate(""); setEndDate("");
+    setDateFiltered(false);
+    fetchVehicles();
+  };
 
   const handleBook = (vehicleId: number) => {
-    if (!me) {
-      router.push(`/login?from=/booking?vehicleId=${vehicleId}`);
-    } else {
-      router.push(`/booking?vehicleId=${vehicleId}`);
-    }
+    const query = new URLSearchParams({ vehicleId: String(vehicleId) });
+    if (startDate) query.set("startDate", startDate);
+    if (endDate) query.set("endDate", endDate);
+    if (!me) router.push(`/login?from=/booking?${query}`);
+    else router.push(`/booking?${query}`);
   };
+
+  const filtered = filter === "All" ? vehicles : vehicles.filter(v => v.type === filter);
+  const days = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000))
+    : null;
 
   return (
     <div style={{ background: "#F7F8FA" }}>
       {/* Header */}
-      <div className="py-10 px-4"
-        style={{ background: "linear-gradient(160deg, #004d23 0%, #00B14F 100%)" }}>
+      <div className="py-10 px-4" style={{ background: "linear-gradient(160deg, #004d23 0%, #00B14F 100%)" }}>
         <div className="max-w-7xl mx-auto">
           <p className="text-xs font-semibold uppercase tracking-widest mb-2"
             style={{ color: "rgba(255,255,255,0.6)" }}>Browse Fleet</p>
-          <h1 className="text-3xl font-extrabold text-white mb-1">Choose Your Ride</h1>
-          <p style={{ color: "rgba(255,255,255,0.8)" }} className="text-sm">
-            {vehicles.length} vehicles available across Davao City
-          </p>
+          <h1 className="text-3xl font-extrabold text-white mb-4">Choose Your Ride</h1>
+
+          {/* Date filter */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 max-w-2xl">
+            <p className="text-xs font-semibold text-white/80 mb-3">📅 Check availability for your dates</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="block text-xs text-white/70 mb-1">Pick-up Date</label>
+                <input type="date" value={startDate} min={today}
+                  onChange={e => { setStartDate(e.target.value); if (endDate && e.target.value > endDate) setEndDate(""); }}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm text-gray-900 bg-white font-semibold outline-none" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-white/70 mb-1">Return Date</label>
+                <input type="date" value={endDate} min={startDate || today}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm text-gray-900 bg-white font-semibold outline-none" />
+              </div>
+              <div className="flex items-end gap-2">
+                <button onClick={handleSearch} disabled={!startDate || !endDate}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+                  style={{ background: "#00B14F", color: "#fff" }}>
+                  Search
+                </button>
+                {dateFiltered && (
+                  <button onClick={handleClear}
+                    className="px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/30 text-white">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* Availability banner */}
+        {dateFiltered && (
+          <div className="mb-5 px-4 py-3 rounded-2xl flex items-center justify-between flex-wrap gap-2"
+            style={{ background: "#E8F8EE", border: "1.5px solid #00B14F" }}>
+            <div className="flex items-center gap-2 text-sm" style={{ color: "#00803A" }}>
+              <span>✅</span>
+              <span>
+                Showing <strong>{vehicles.length}</strong> available vehicle{vehicles.length !== 1 ? "s" : ""} for{" "}
+                <strong>{new Date(startDate).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}</strong>
+                {" → "}
+                <strong>{new Date(endDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</strong>
+                {days && <span> ({days} day{days > 1 ? "s" : ""})</span>}
+              </span>
+            </div>
+            <span className="text-xs text-gray-400">{allCount - vehicles.length} unavailable hidden</span>
+          </div>
+        )}
+
         {/* Filter tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {types.map(t => (
@@ -104,8 +180,20 @@ export default function VehiclesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 text-gray-400">
-            <div className="text-5xl mb-4">🔍</div>
-            <p className="font-medium">No vehicles found.</p>
+            <div className="text-5xl mb-4">{dateFiltered ? "🗓️" : "🔍"}</div>
+            <p className="font-semibold text-gray-600 mb-1">
+              {dateFiltered ? "No vehicles available for these dates" : "No vehicles found"}
+            </p>
+            {dateFiltered && (
+              <p className="text-sm text-gray-400 mb-4">All vehicles are booked during this period. Try different dates.</p>
+            )}
+            {dateFiltered && (
+              <button onClick={handleClear}
+                className="px-5 py-2 rounded-xl text-sm font-bold text-white"
+                style={{ background: "#00B14F" }}>
+                Clear dates
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -118,12 +206,19 @@ export default function VehiclesPage() {
                     style={{ background: TYPE_BG[v.type] ?? "#f3f4f6" }}>
                     <span className="text-8xl vehicle-icon drop-shadow-md">{ICONS[v.type] ?? "🚗"}</span>
                     <div className="absolute top-3 right-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-bold"
-                        style={v.isAvailable
-                          ? { background: "#dcfce7", color: "#166534" }
-                          : { background: "#fee2e2", color: "#991b1b" }}>
-                        {v.isAvailable ? "✓ Available" : "✗ Booked"}
-                      </span>
+                      {dateFiltered ? (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold"
+                          style={{ background: "#dcfce7", color: "#166534" }}>
+                          ✓ Free on your dates
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold"
+                          style={v.isAvailable
+                            ? { background: "#dcfce7", color: "#166534" }
+                            : { background: "#fee2e2", color: "#991b1b" }}>
+                          {v.isAvailable ? "✓ Available" : "✗ Booked"}
+                        </span>
+                      )}
                     </div>
                     <div className="absolute top-3 left-3">
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/80 text-gray-700">
@@ -163,15 +258,16 @@ export default function VehiclesPage() {
                           ₱{v.pricePerDay.toLocaleString()}
                         </span>
                         <span className="text-gray-400 text-xs"> /day</span>
-                      </div>
-                      <div className="flex gap-2">
-                        {v.isAvailable && (
-                          <button onClick={() => handleBook(v.id)}
-                            className="px-4 py-2 rounded-xl text-xs font-bold text-white btn-green">
-                            {me ? "Book Now" : "Log in to Book"}
-                          </button>
+                        {days && (
+                          <div className="text-xs font-semibold" style={{ color: "#00803A" }}>
+                            ₱{(v.pricePerDay * days).toLocaleString()} total
+                          </div>
                         )}
                       </div>
+                      <button onClick={() => handleBook(v.id)}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white btn-green">
+                        {me ? "Book Now" : "Log in to Book"}
+                      </button>
                     </div>
                   </div>
                 </div>

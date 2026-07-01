@@ -1,9 +1,42 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
-export async function GET() {
-  const vehicles = await prisma.vehicle.findMany({ orderBy: { createdAt: "desc" } });
-  return Response.json(vehicles);
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Find vehicle IDs that have conflicting bookings
+      const busyBookings = await prisma.booking.findMany({
+        where: {
+          status: { in: ["pending", "confirmed"] },
+          OR: [{ startDate: { lte: end }, endDate: { gte: start } }],
+        },
+        select: { vehicleId: true },
+      });
+      const busyIds = [...new Set(busyBookings.map(b => b.vehicleId))];
+
+      const vehicles = await prisma.vehicle.findMany({
+        where: {
+          isAvailable: true,
+          id: { notIn: busyIds.length ? busyIds : [-1] },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return Response.json(vehicles);
+    }
+
+    const vehicles = await prisma.vehicle.findMany({ orderBy: { createdAt: "desc" } });
+    return Response.json(vehicles);
+  } catch (err) {
+    console.error("[vehicles GET]", err);
+    return Response.json({ error: "Failed to fetch vehicles" }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {

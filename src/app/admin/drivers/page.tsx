@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
+
+type Booking = {
+  id: number;
+  startDate: string;
+  endDate: string;
+  customerName: string;
+  status: string;
+  vehicle: { name: string; type: string };
+};
 
 type Driver = {
   id: number;
@@ -9,27 +19,39 @@ type Driver = {
   licenseNo: string;
   experience: number;
   status: string;
+  realStatus: string;
   notes: string | null;
+  bookings: Booking[];
 };
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  available: { bg: "#dcfce7", text: "#166534" },
-  "on-duty":  { bg: "#fef3c7", text: "#92400e" },
-  off:        { bg: "#f3f4f6", text: "#6b7280" },
+const REAL_STATUS: Record<string, { bg: string; text: string; label: string; dot: string }> = {
+  available: { bg: "#dcfce7", text: "#166534", label: "Available", dot: "#22c55e" },
+  "on-duty":  { bg: "#fef3c7", text: "#92400e", label: "On Duty",   dot: "#f59e0b" },
+  off:        { bg: "#f3f4f6", text: "#6b7280", label: "Day Off",   dot: "#9ca3af" },
 };
 
-const EMPTY_FORM = {
-  name: "", phone: "", licenseNo: "", experience: "", status: "available", notes: "",
+const BOOKING_STATUS: Record<string, { bg: string; text: string }> = {
+  pending:   { bg: "#fef3c7", text: "#92400e" },
+  confirmed: { bg: "#dcfce7", text: "#166534" },
 };
+
+const EMPTY_FORM = { name: "", phone: "", licenseNo: "", experience: "", status: "available", notes: "" };
 
 export default function AdminDriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const load = () => fetch("/api/drivers").then((r) => r.json()).then(setDrivers);
+  const load = () =>
+    fetch("/api/admin/drivers").then(r => r.json()).then(data => {
+      setDrivers(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+
   useEffect(() => { load(); }, []);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setShowForm(true); };
@@ -60,12 +82,12 @@ export default function AdminDriversPage() {
     load();
   };
 
-  const inputClass = "w-full rounded-xl px-3 py-2.5 text-sm text-gray-900 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white transition-all";
+  const inp = "w-full rounded-xl px-3 py-2.5 text-sm text-gray-900 border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-50 outline-none bg-white transition-all";
 
   const counts = {
-    available: drivers.filter((d) => d.status === "available").length,
-    onDuty:    drivers.filter((d) => d.status === "on-duty").length,
-    off:       drivers.filter((d) => d.status === "off").length,
+    available: drivers.filter(d => d.realStatus === "available").length,
+    onDuty:    drivers.filter(d => d.realStatus === "on-duty").length,
+    off:       drivers.filter(d => d.realStatus === "off").length,
   };
 
   return (
@@ -76,32 +98,176 @@ export default function AdminDriversPage() {
           <p className="text-sm text-gray-500 mt-0.5">{drivers.length} drivers registered</p>
         </div>
         <button onClick={openCreate}
-          className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          style={{ background: "#0f4c81" }}>
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
+          style={{ background: "#00B14F" }}>
           + Add Driver
         </button>
       </div>
 
-      {/* Status cards */}
+      {/* Status summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Available", count: counts.available, bg: "#dcfce7", text: "#166534", icon: "✅" },
-          { label: "On Duty",   count: counts.onDuty,   bg: "#fef3c7", text: "#92400e", icon: "🚐" },
-          { label: "Day Off",   count: counts.off,      bg: "#f3f4f6", text: "#6b7280", icon: "💤" },
-        ].map((s) => (
+          { label: "Available",  count: counts.available, icon: "✅", ...REAL_STATUS.available },
+          { label: "On Duty",    count: counts.onDuty,    icon: "🚐", ...REAL_STATUS["on-duty"] },
+          { label: "Day Off",    count: counts.off,        icon: "💤", ...REAL_STATUS.off },
+        ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: s.bg }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: s.bg }}>
               {s.icon}
             </div>
             <div>
-              <div className="text-2xl font-extrabold" style={{ color: "#0f4c81" }}>{s.count}</div>
-              <div className="text-xs text-gray-500">{s.label}</div>
+              <div className="text-2xl font-extrabold text-gray-900">{s.count}</div>
+              <div className="text-xs font-semibold" style={{ color: s.text }}>{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal */}
+      {/* Driver cards with schedule */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="w-9 h-9 rounded-full border-4 animate-spin" style={{ borderColor: "#00B14F", borderTopColor: "transparent" }} />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {drivers.map(d => {
+            const rs = REAL_STATUS[d.realStatus] ?? REAL_STATUS.available;
+            const isExpanded = expandedId === d.id;
+            const upcomingCount = d.bookings.length;
+
+            return (
+              <div key={d.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {/* Driver row */}
+                <div className="flex items-center gap-4 px-5 py-4">
+                  {/* Avatar */}
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-black text-white flex-shrink-0"
+                    style={{ background: "#00B14F" }}>
+                    {d.name.charAt(0)}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-gray-900">{d.name}</span>
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+                        style={{ background: rs.bg, color: rs.text }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: rs.dot }} />
+                        {rs.label}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {d.phone} · {d.licenseNo} · {d.experience} yrs exp
+                    </div>
+                    {d.notes && <div className="text-xs text-gray-400 mt-0.5 italic">{d.notes}</div>}
+                  </div>
+
+                  {/* Schedule toggle */}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : d.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                    style={{
+                      background: upcomingCount > 0 ? "#E8F8EE" : "#f3f4f6",
+                      color: upcomingCount > 0 ? "#00803A" : "#6b7280",
+                    }}>
+                    📅 {upcomingCount > 0 ? `${upcomingCount} booking${upcomingCount > 1 ? "s" : ""}` : "No schedule"}
+                    <span className="ml-0.5">{isExpanded ? "▲" : "▼"}</span>
+                  </button>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button onClick={() => openEdit(d)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                      style={{ background: "#eff6ff", color: "#1d4ed8" }}>Edit</button>
+                    <button onClick={() => handleDelete(d.id)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                      style={{ background: "#fee2e2", color: "#991b1b" }}>Delete</button>
+                  </div>
+                </div>
+
+                {/* Schedule panel */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 px-5 py-4" style={{ background: "#f8fafc" }}>
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                      Upcoming Bookings / Schedule
+                    </div>
+                    {d.bookings.length === 0 ? (
+                      <div className="text-sm text-gray-400 py-3 text-center">
+                        🗓️ No upcoming bookings — driver is free
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {d.bookings.map(b => {
+                          const bs = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.pending;
+                          const start = new Date(b.startDate);
+                          const end = new Date(b.endDate);
+                          const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const isActive = start <= today && end >= today;
+
+                          return (
+                            <div key={b.id}
+                              className="flex items-center gap-3 p-3 rounded-xl border"
+                              style={{
+                                background: isActive ? "#E8F8EE" : "#fff",
+                                borderColor: isActive ? "#86efac" : "#e5e7eb",
+                              }}>
+                              {/* Date bar */}
+                              <div className="flex-shrink-0 text-center w-16">
+                                <div className="text-xs font-bold text-gray-900">
+                                  {format(start, "MMM d")}
+                                </div>
+                                <div className="text-xs text-gray-400">→</div>
+                                <div className="text-xs font-bold text-gray-900">
+                                  {format(end, "MMM d")}
+                                </div>
+                              </div>
+
+                              {/* Divider */}
+                              <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
+
+                              {/* Trip info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-900 text-sm">{b.customerName}</div>
+                                <div className="text-xs text-gray-400">
+                                  {b.vehicle.name} · {days} day{days > 1 ? "s" : ""}
+                                </div>
+                              </div>
+
+                              {/* Status + active badge */}
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold capitalize"
+                                  style={{ background: bs.bg, color: bs.text }}>
+                                  {b.status}
+                                </span>
+                                {isActive && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                                    style={{ background: "#fef3c7", color: "#92400e" }}>
+                                    🚐 On Duty Today
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {drivers.length === 0 && (
+            <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-3">👨‍✈️</div>
+              <p className="font-medium text-gray-500">No drivers yet. Add one!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleSave as never} className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
@@ -112,113 +278,54 @@ export default function AdminDriversPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Full Name *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Juan Dela Cruz" required className={inputClass} />
+                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                  placeholder="Juan Dela Cruz" required className={inp} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Phone *</label>
-                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="09XXXXXXXXX" required className={inputClass} />
+                  <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
+                    placeholder="09XXXXXXXXX" required className={inp} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">License No. *</label>
-                  <input type="text" value={form.licenseNo} onChange={(e) => setForm({ ...form, licenseNo: e.target.value.toUpperCase() })}
-                    placeholder="N01-23-456789" required className={inputClass} />
+                  <input type="text" value={form.licenseNo} onChange={e => setForm({ ...form, licenseNo: e.target.value.toUpperCase() })}
+                    placeholder="N01-23-456789" required className={inp} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Experience (years)</label>
                   <input type="number" min="0" value={form.experience}
-                    onChange={(e) => setForm({ ...form, experience: e.target.value })} className={inputClass} />
+                    onChange={e => setForm({ ...form, experience: e.target.value })} className={inp} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputClass}>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inp}>
                     <option value="available">Available</option>
-                    <option value="on-duty">On Duty</option>
                     <option value="off">Day Off</option>
                   </select>
+                  <p className="text-xs text-gray-400 mt-0.5">On Duty is auto-detected from bookings</p>
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
-                <textarea value={form.notes} rows={2}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Additional info..." className={inputClass} style={{ resize: "none" }} />
+                <textarea value={form.notes} rows={2} onChange={e => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Additional info..." className={inp} style={{ resize: "none" }} />
               </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button type="submit" disabled={saving}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
-                style={{ background: "#0f4c81" }}>
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: "#00B14F" }}>
                 {saving ? "Saving..." : editing ? "Save Changes" : "Add Driver"}
               </button>
               <button type="button" onClick={() => setShowForm(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600">
                 Cancel
               </button>
             </div>
           </form>
         </div>
       )}
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full">
-          <thead style={{ background: "#f8fafc" }}>
-            <tr className="border-b border-gray-100">
-              <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase">Driver</th>
-              <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase">License No.</th>
-              <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase">Experience</th>
-              <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
-              <th className="text-right px-5 py-3 text-xs font-bold text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {drivers.map((d) => {
-              const sc = STATUS_COLORS[d.status] ?? STATUS_COLORS.off;
-              return (
-                <tr key={d.id} className="hover:bg-blue-50/30 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                        style={{ background: "#0f4c81" }}>
-                        {d.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">{d.name}</div>
-                        <div className="text-xs text-gray-400">{d.phone}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 text-sm text-gray-600 font-mono">{d.licenseNo}</td>
-                  <td className="px-5 py-4 text-sm text-gray-600">{d.experience} yr{d.experience !== 1 ? "s" : ""}</td>
-                  <td className="px-5 py-4">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold capitalize"
-                      style={{ background: sc.bg, color: sc.text }}>
-                      {d.status === "on-duty" ? "On Duty" : d.status === "off" ? "Day Off" : "Available"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <button onClick={() => openEdit(d)}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg mr-2 transition-all hover:-translate-y-0.5"
-                      style={{ background: "#eff6ff", color: "#1d4ed8" }}>Edit</button>
-                    <button onClick={() => handleDelete(d.id)}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-0.5"
-                      style={{ background: "#fee2e2", color: "#991b1b" }}>Delete</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {drivers.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-4xl mb-3">👨‍✈️</div>
-            <p className="font-medium">No drivers yet. Add one!</p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

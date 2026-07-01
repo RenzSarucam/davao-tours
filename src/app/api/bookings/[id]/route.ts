@@ -7,9 +7,13 @@ export async function PUT(
 ) {
   const { id } = await ctx.params;
   const body = await request.json();
+  const updateData: Record<string, unknown> = {};
+  if (body.status !== undefined) updateData.status = body.status;
+  if (body.proofImageUrl !== undefined) updateData.proofImageUrl = body.proofImageUrl;
+  if (body.reservationFeePaid !== undefined) updateData.reservationFeePaid = body.reservationFeePaid;
   const booking = await prisma.booking.update({
     where: { id: Number(id) },
-    data: { status: body.status },
+    data: updateData,
     include: { vehicle: true },
   });
   return Response.json(booking);
