@@ -1,4 +1,6 @@
+"use client";
 import Link from "next/link";
+import { useState } from "react";
 
 const services = [
   { icon: "🚗", label: "GrabCar", sub: "Sedan / City Ride", href: "/vehicles?type=Sedan" },
@@ -26,8 +28,27 @@ const whys = [
 ];
 
 export default function Home() {
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(name: string) {
+    setToast(name);
+    setTimeout(() => setToast(null), 3000);
+  }
+
   return (
     <div style={{ background: "#F7F8FA" }}>
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-3xl shadow-2xl px-10 py-8 flex flex-col items-center gap-3 text-center pointer-events-auto"
+            style={{ minWidth: 300, maxWidth: 360 }}>
+            <span className="text-4xl">🚧</span>
+            <div className="font-bold text-gray-900 text-base">{toast}</div>
+            <div className="text-gray-500 text-sm">This destination is not yet available.<br />Coming soon!</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden"
@@ -101,12 +122,12 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {destinations.map((d) => (
-            <Link key={d.name} href="/packages"
-              className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all block text-center">
+            <button key={d.name} onClick={() => showToast(d.name)}
+              className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all block text-center w-full cursor-pointer">
               <div className="text-3xl mb-2">{d.icon}</div>
               <div className="font-semibold text-gray-900 text-xs leading-tight">{d.name}</div>
               <div className="text-gray-400 text-xs mt-1">{d.dist}</div>
-            </Link>
+            </button>
           ))}
         </div>
       </section>
